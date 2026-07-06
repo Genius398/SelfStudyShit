@@ -1,0 +1,1050 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>The Study Wheel</title>
+<style>
+  :root{
+    --bg:#eee7d8;
+    --panel:#faf6ec;
+    --ink:#242018;
+    --line:#c9bd9e;
+    --gold:#a9852f;
+    --gold-light:#cba84f;
+    --navy:#233350;
+    --burgundy:#7a2e2e;
+    --forest:#2f4d3a;
+    --muted:#6b6250;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0;
+    min-height:100%;
+    color:var(--ink);
+    font-family:Georgia,'Times New Roman',serif;
+    background:var(--bg);
+  }
+  body{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    min-height:100vh;
+    padding:36px 16px 56px;
+  }
+
+  .eyebrow{
+    letter-spacing:.32em;
+    font-size:11px;
+    color:var(--gold);
+    text-transform:uppercase;
+    margin-bottom:8px;
+  }
+  h1{
+    font-size:clamp(23px,4vw,32px);
+    margin:0 0 6px;
+    font-weight:400;
+    letter-spacing:.3px;
+    color:var(--ink);
+    text-align:center;
+  }
+  .rule{
+    width:100px;
+    height:1px;
+    background:var(--gold);
+    margin:6px 0 30px;
+    opacity:.8;
+  }
+
+  .stage{
+    position:relative;
+    width:min(78vw,440px);
+    aspect-ratio:1/1;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+
+  #wheelWrap{
+    position:relative;
+    width:100%;
+    height:100%;
+    border-radius:50%;
+    background:var(--panel);
+    box-shadow:
+      0 0 0 3px var(--gold),
+      0 0 0 5px var(--panel),
+      0 0 0 6px var(--line),
+      0 18px 36px -16px rgba(0,0,0,.35);
+  }
+
+  #wheelCanvas{
+    position:absolute;
+    inset:0;
+    width:100%;
+    height:100%;
+    border-radius:50%;
+    will-change:transform;
+  }
+
+  .hub{
+    position:absolute;
+    top:50%;left:50%;
+    width:13%;
+    height:13%;
+    transform:translate(-50%,-50%);
+    border-radius:50%;
+    background:var(--panel);
+    border:3px solid var(--gold);
+    box-shadow:0 2px 6px rgba(0,0,0,.25);
+    z-index:5;
+  }
+
+  /* pointer fixed on the RIGHT side, tip pointing left into the wheel */
+  #pointer{
+    position:absolute;
+    top:50%;
+    right:-6%;
+    width:54px;
+    height:38px;
+    transform:translate(0,-50%) rotate(0deg);
+    transform-origin:8% 50%;
+    z-index:10;
+    filter:drop-shadow(2px 3px 4px rgba(0,0,0,.35));
+    transition:transform 80ms cubic-bezier(.3,1.6,.6,1);
+  }
+  #pointer svg{width:100%;height:100%;display:block;}
+  #pointer.tick{ transform:translate(0,-50%) rotate(13deg); }
+
+  .btnRow{
+    margin-top:36px;
+    display:flex;
+    gap:16px;
+    align-items:center;
+  }
+
+  #spinBtn{
+    padding:14px 42px;
+    font-family:Georgia,serif;
+    font-size:15px;
+    font-weight:700;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:var(--panel);
+    background:var(--navy);
+    border:1px solid var(--navy);
+    border-radius:3px;
+    cursor:pointer;
+    box-shadow:0 6px 14px -6px rgba(0,0,0,.4);
+    transition:transform .15s ease, box-shadow .15s ease, background .15s ease;
+  }
+  #spinBtn:hover{transform:translateY(-2px);background:#2c3f63;}
+  #spinBtn:active{transform:translateY(0) scale(.98);}
+  #spinBtn:disabled{
+    filter:grayscale(.3) brightness(.8);
+    cursor:not-allowed;
+    box-shadow:none;
+    transform:none;
+  }
+
+  .hint{
+    color:var(--muted);
+    font-size:12.5px;
+    font-style:italic;
+    margin-top:12px;
+  }
+
+  #exportLogBtn{
+    margin-top:14px;
+    background:none;
+    border:1px solid var(--line);
+    color:var(--muted);
+    font-family:Georgia,serif;
+    font-size:12px;
+    font-style:italic;
+    letter-spacing:.02em;
+    border-radius:4px;
+    padding:8px 16px;
+    cursor:pointer;
+    transition:border-color .15s ease, color .15s ease;
+  }
+  #exportLogBtn:hover{
+    border-color:var(--gold);
+    color:var(--gold);
+  }
+
+  #overlay{
+    position:fixed;
+    inset:0;
+    background:rgba(30,25,15,.5);
+    backdrop-filter:blur(4px);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    opacity:0;
+    pointer-events:none;
+    transition:opacity .3s ease;
+    z-index:100;
+    padding:20px;
+  }
+  #overlay.show{opacity:1;pointer-events:auto;}
+
+  .card{
+    position:relative;
+    width:min(92vw,410px);
+    background:var(--panel);
+    border:1px solid var(--gold);
+    border-radius:6px;
+    padding:38px 32px 30px;
+    text-align:center;
+    box-shadow:0 24px 60px -20px rgba(0,0,0,.5);
+    transform:scale(.9) translateY(14px);
+    transition:transform .35s cubic-bezier(.2,1.4,.4,1);
+  }
+  #overlay.show .card{transform:scale(1) translateY(0);}
+
+  .card .tag{
+    font-size:11px;
+    letter-spacing:.3em;
+    text-transform:uppercase;
+    color:var(--gold);
+    margin-bottom:14px;
+  }
+  .card h2{
+    margin:0 0 16px;
+    font-size:clamp(19px,5vw,25px);
+    line-height:1.35;
+    font-weight:700;
+    color:var(--ink);
+  }
+  .card p.sub{
+    color:var(--muted);
+    font-size:13.5px;
+    font-style:italic;
+    margin:0 0 24px;
+  }
+
+  /* ---- topic entry, before a session starts ---- */
+  .topicSection{
+    text-align:left;
+    margin:0 0 22px;
+  }
+  .topicLabel{
+    font-size:11px;
+    letter-spacing:.18em;
+    text-transform:uppercase;
+    color:var(--gold);
+    margin-bottom:10px;
+  }
+  #topicList{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    margin-bottom:10px;
+  }
+  .topicRow{
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .topicRow .bullet{
+    color:var(--gold);
+    font-size:14px;
+    line-height:1;
+    flex:0 0 auto;
+  }
+  .topicRow input{
+    flex:1;
+    font-family:Georgia,serif;
+    font-size:13.5px;
+    color:var(--ink);
+    background:var(--bg);
+    border:1px solid var(--line);
+    border-radius:3px;
+    padding:9px 10px;
+  }
+  .topicRow input:focus{
+    outline:none;
+    border-color:var(--gold);
+  }
+  .topicRow .removeTopic{
+    flex:0 0 auto;
+    background:none;
+    border:none;
+    color:var(--muted);
+    font-size:15px;
+    cursor:pointer;
+    line-height:1;
+    padding:2px 4px;
+  }
+  .topicRow .removeTopic:hover{color:var(--burgundy);}
+  #addTopicBtn{
+    background:none;
+    border:1px dashed var(--line);
+    color:var(--muted);
+    font-family:Georgia,serif;
+    font-size:12.5px;
+    font-style:italic;
+    border-radius:3px;
+    padding:8px 12px;
+    cursor:pointer;
+    width:100%;
+  }
+  #addTopicBtn:hover{border-color:var(--gold);color:var(--gold);}
+  .topicWarning{
+    font-size:12px;
+    color:var(--burgundy);
+    font-style:italic;
+    margin:-4px 0 12px;
+    min-height:14px;
+  }
+  #workBtn{
+    width:100%;
+    padding:14px 0;
+    font-family:Georgia,serif;
+    font-size:15px;
+    font-weight:700;
+    letter-spacing:.04em;
+    text-transform:uppercase;
+    border:1px solid var(--navy);
+    border-radius:3px;
+    color:var(--panel);
+    background:var(--navy);
+    cursor:pointer;
+    box-shadow:0 8px 18px -8px rgba(0,0,0,.4);
+    transition:transform .15s ease, background .15s ease;
+  }
+  #workBtn:hover{transform:translateY(-2px);background:#2c3f63;}
+  #workBtn:active{transform:translateY(0) scale(.98);}
+
+  .closeX{
+    position:absolute;
+    top:12px;right:14px;
+    color:var(--muted);
+    background:none;
+    border:none;
+    font-size:19px;
+    cursor:pointer;
+    line-height:1;
+    font-family:Georgia,serif;
+  }
+  .closeX:hover{color:var(--ink);}
+
+  /* ---- live analog clock, top-left ---- */
+  #liveClock{
+    position:fixed;
+    left:22px;
+    top:22px;
+    background:var(--panel);
+    border:1px solid var(--gold);
+    border-radius:6px;
+    padding:14px 16px;
+    text-align:center;
+    box-shadow:0 8px 20px -12px rgba(0,0,0,.4);
+    z-index:40;
+  }
+  #liveClock .clockLabel{
+    font-size:9px;
+    letter-spacing:.24em;
+    text-transform:uppercase;
+    color:var(--gold);
+    margin-bottom:8px;
+  }
+  #liveClock .analogFace{
+    width:92px;
+    height:92px;
+    margin:0 auto 8px;
+  }
+  #liveClock .analogFace svg{width:100%;height:100%;display:block;}
+  #liveClock .digitalTime{
+    font-size:13px;
+    font-weight:400;
+    letter-spacing:.01em;
+    color:var(--ink);
+    white-space:nowrap;
+  }
+  #liveClock .clockAmpm{
+    font-size:11px;
+    color:var(--muted);
+    margin-left:2px;
+  }
+  #liveClock .clockDate{
+    margin-top:4px;
+    font-size:11px;
+    font-style:italic;
+    color:var(--muted);
+  }
+  @media (max-width:760px){
+    #liveClock{
+      left:12px;
+      top:12px;
+      padding:10px 12px;
+    }
+    #liveClock .analogFace{width:68px;height:68px;}
+  }
+
+  /* ---- session timer widget, bottom-right ---- */
+  #sessionWidget{
+    position:fixed;
+    right:22px;
+    bottom:22px;
+    background:var(--panel);
+    border:1px solid var(--gold);
+    border-radius:6px;
+    padding:16px 20px;
+    text-align:center;
+    box-shadow:0 10px 26px -14px rgba(0,0,0,.4);
+    z-index:40;
+    min-width:180px;
+    opacity:0;
+    transform:translateY(12px);
+    pointer-events:none;
+    transition:opacity .3s ease, transform .3s ease;
+  }
+  #sessionWidget.show{
+    opacity:1;
+    transform:translateY(0);
+    pointer-events:auto;
+  }
+  #sessionWidget .sw-label{
+    font-size:10px;
+    letter-spacing:.22em;
+    text-transform:uppercase;
+    color:var(--gold);
+    margin-bottom:8px;
+  }
+  #sessionWidget .sw-subject{
+    font-size:16px;
+    font-weight:700;
+    color:var(--ink);
+    line-height:1.3;
+    margin-bottom:3px;
+  }
+  #sessionWidget .sw-topics{
+    font-size:11.5px;
+    font-style:italic;
+    color:var(--muted);
+    line-height:1.4;
+    margin-bottom:12px;
+    padding-bottom:10px;
+    border-bottom:1px solid var(--line);
+  }
+  #sessionWidget .sw-time{
+    font-size:24px;
+    font-weight:700;
+    margin-bottom:4px;
+  }
+  #sessionWidget .sw-status{
+    font-size:11.5px;
+    font-style:italic;
+    color:var(--muted);
+    margin-bottom:12px;
+  }
+  #sessionWidget .sw-btns{
+    display:flex;
+    gap:8px;
+  }
+  #sessionWidget button{
+    flex:1;
+    padding:9px 0;
+    font-family:Georgia,serif;
+    font-size:12.5px;
+    font-weight:700;
+    letter-spacing:.03em;
+    text-transform:uppercase;
+    border-radius:3px;
+    cursor:pointer;
+    transition:transform .15s ease, filter .15s ease;
+  }
+  #pauseBtn{
+    background:var(--panel);
+    border:1px solid var(--navy);
+    color:var(--navy);
+  }
+  #pauseBtn:hover{transform:translateY(-1px);}
+  #endSessionBtn{
+    background:var(--burgundy);
+    border:1px solid var(--burgundy);
+    color:var(--panel);
+  }
+  #endSessionBtn:disabled{
+    background:var(--line);
+    border-color:var(--line);
+    color:var(--muted);
+    cursor:not-allowed;
+    filter:none;
+    transform:none;
+  }
+  #endSessionBtn:not(:disabled):hover{transform:translateY(-1px);}
+  @media (max-width:760px){
+    #sessionWidget{
+      right:16px;
+      bottom:16px;
+      min-width:150px;
+    }
+  }
+</style>
+</head>
+<body>
+
+  <div id="liveClock">
+    <div class="clockLabel">Now</div>
+    <div class="analogFace">
+      <svg viewBox="0 0 100 100">
+        <circle cx="50" cy="50" r="47" fill="var(--panel)" stroke="var(--gold)" stroke-width="2"/>
+        <g id="ticks" stroke="var(--ink)" stroke-width="1.5" opacity="0.55"></g>
+        <line id="hourHand" x1="50" y1="50" x2="50" y2="30" stroke="var(--ink)" stroke-width="3" stroke-linecap="round"/>
+        <line id="minHand" x1="50" y1="50" x2="50" y2="18" stroke="var(--ink)" stroke-width="2" stroke-linecap="round"/>
+        <line id="secHand" x1="50" y1="50" x2="50" y2="14" stroke="var(--burgundy)" stroke-width="1" stroke-linecap="round"/>
+        <circle cx="50" cy="50" r="2.4" fill="var(--gold)"/>
+      </svg>
+    </div>
+    <div class="digitalTime"><span id="clockTimeStr">--:--</span><span class="clockAmpm" id="clockAmpm"></span></div>
+    <div class="clockDate" id="clockDate"></div>
+  </div>
+
+  <div id="sessionWidget">
+    <div class="sw-label">Study Session</div>
+    <div class="sw-subject" id="swSubject">—</div>
+    <div class="sw-topics" id="swTopics">—</div>
+    <div class="sw-time" id="swTime">60:00</div>
+    <div class="sw-status" id="swStatus">Minimum session remaining</div>
+    <div class="sw-btns">
+      <button id="pauseBtn">Pause</button>
+      <button id="endSessionBtn" disabled>End</button>
+    </div>
+  </div>
+
+  <div class="eyebrow">Pick of the Day</div>
+  <h1>The Study Wheel</h1>
+  <div class="rule"></div>
+
+  <div class="stage">
+    <div id="wheelWrap">
+      <canvas id="wheelCanvas" width="900" height="900"></canvas>
+      <div class="hub"></div>
+    </div>
+    <div id="pointer">
+      <svg viewBox="0 0 54 38">
+        <defs>
+          <linearGradient id="pgrad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#cba84f"/>
+            <stop offset="100%" stop-color="#8a6c26"/>
+          </linearGradient>
+        </defs>
+        <path d="M2 19 L38 3 Q54 19 38 35 Z" fill="url(#pgrad)" stroke="#6b5620" stroke-width="1.5"/>
+        <circle cx="38" cy="19" r="4.2" fill="#242018" stroke="#8a6c26" stroke-width="1"/>
+      </svg>
+    </div>
+  </div>
+
+  <div class="btnRow">
+    <button id="spinBtn">Spin</button>
+  </div>
+  <div class="hint">Whatever it lands on, you're doing it. No re-spins.</div>
+  <button id="exportLogBtn" type="button">Export session log (CSV)</button>
+
+  <div id="overlay">
+    <div class="card">
+      <div class="tag">Result</div>
+      <h2 id="resultText">—</h2>
+      <p class="sub" id="resultSub">The wheel has spoken.</p>
+
+      <div class="topicSection">
+        <div class="topicLabel">What exactly will you cover?</div>
+        <div id="topicList"></div>
+        <button type="button" id="addTopicBtn">+ Add another</button>
+      </div>
+      <div class="topicWarning" id="topicWarning"></div>
+
+      <button id="workBtn">Start</button>
+    </div>
+  </div>
+
+<script>
+(function(){
+  // ---------- Data + TRUE weights (segment size == actual odds) ----------
+  const segments = [
+    { label: "NSEP backlog",     weight:15, color1:"#233350", color2:"#16223a",
+      message: "NSEP Physics — mechanics, electrodynamics, or modern physics. Pick up whichever topic's furthest behind and clear a set." },
+    { label: "Maths backlog",    weight:15, color1:"#7a2e2e", color2:"#5c2020",
+      message: "Calculus, algebra, or coordinate geometry — whichever chapter's been sitting unsolved the longest." },
+    { label: "Chem backlog",     weight:15, color1:"#2f4d3a", color2:"#213a2a",
+      message: "Physical, organic, or inorganic — GOC, thermodynamics, or periodic trends. Pick the one you keep skipping." },
+    { label: "Bio practice",     weight:8,  color1:"#5a4a2c", color2:"#40351f",
+      message: "A NCERT-line round — diagrams, genetics, or physiology. Quick recall practice, nothing heavy." },
+    { label: "Math practice",    weight:15, color1:"#4a3960", color2:"#362946",
+      message: "Trigonometry, calculus, or algebra drills — a working problem set to keep formulas sharp." },
+    { label: "Chem practice",    weight:15, color1:"#a9852f", color2:"#7c621f",
+      message: "Numericals, named reactions, or mechanisms — pick a set and run through it." },
+    { label: "Physics practice", weight:15, color1:"#2f5d5a", color2:"#1f4340",
+      message: "Kinematics, thermodynamics, or optics — numericals and derivations, your choice of topic." },
+    { label: "Block Of Dread", weight:2, color1:"#3a332a", color2:"#242018",
+      message: "That one chapter which you aren't opening for the past month. Open it. Just the first page." },
+  ];
+
+  const totalWeight = segments.reduce((a,s)=>a+s.weight,0); // 100
+
+  // reference angle 0 = pointer position (RIGHT side, 3 o'clock)
+  let acc = 0;
+  const bounds = segments.map(s=>{
+    const width = (s.weight/totalWeight) * Math.PI*2;
+    const start = acc;
+    const end = acc + width;
+    acc = end;
+    return { start, end, width };
+  });
+
+  function weightedPick(){
+    let r = Math.random() * totalWeight;
+    for(let i=0;i<segments.length;i++){
+      if(r < segments[i].weight) return i;
+      r -= segments[i].weight;
+    }
+    return segments.length-1;
+  }
+
+  // ---------- Canvas drawing ----------
+  const canvas = document.getElementById('wheelCanvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const cx = W/2, cy = H/2;
+  const radius = W/2 - 10;
+
+  function wrapText(ctx, text, maxWidth){
+    const words = text.split(' ');
+    const lines = [];
+    let line = '';
+    for(const w of words){
+      const test = line ? line + ' ' + w : w;
+      if(ctx.measureText(test).width > maxWidth && line){
+        lines.push(line);
+        line = w;
+      } else {
+        line = test;
+      }
+    }
+    if(line) lines.push(line);
+    return lines;
+  }
+
+  function drawWheel(){
+    ctx.clearRect(0,0,W,H);
+
+    segments.forEach((seg, i)=>{
+      const { start, end, width } = bounds[i];
+
+      const grad = ctx.createRadialGradient(cx,cy, radius*0.1, cx,cy, radius);
+      grad.addColorStop(0, seg.color2);
+      grad.addColorStop(1, seg.color1);
+
+      ctx.beginPath();
+      ctx.moveTo(cx,cy);
+      ctx.arc(cx,cy,radius,start,end);
+      ctx.closePath();
+      ctx.fillStyle = grad;
+      ctx.fill();
+
+      // divider line
+      ctx.beginPath();
+      ctx.moveTo(cx,cy);
+      ctx.lineTo(cx + radius*Math.cos(start), cy + radius*Math.sin(start));
+      ctx.strokeStyle = 'rgba(250,246,236,0.5)';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+
+      // label
+      ctx.save();
+      ctx.translate(cx,cy);
+      ctx.rotate(start + width/2);
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#faf6ec';
+      const fontSize = width < 0.3 ? 16 : (width < 0.6 ? 22 : 26);
+      ctx.font = `700 ${fontSize}px Georgia, serif`;
+
+      const maxWidth = radius*0.7;
+      const lines = wrapText(ctx, seg.label, maxWidth);
+      const lineHeight = fontSize+4;
+      const totalH = lines.length*lineHeight;
+      lines.forEach((ln, idx)=>{
+        const y = -totalH/2 + lineHeight/2 + idx*lineHeight;
+        ctx.fillText(ln, radius - 22, y);
+      });
+      ctx.restore();
+    });
+
+    // outer rim
+    ctx.beginPath();
+    ctx.arc(cx,cy,radius,0,Math.PI*2);
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = 'rgba(169,133,47,0.7)';
+    ctx.stroke();
+  }
+
+  drawWheel();
+
+  // ---------- Spin physics ----------
+  const spinBtn = document.getElementById('spinBtn');
+  const pointer = document.getElementById('pointer');
+  const overlay = document.getElementById('overlay');
+  const resultText = document.getElementById('resultText');
+  const workBtn = document.getElementById('workBtn');
+
+  let currentRotation = 0;
+  let spinning = false;
+
+  function easeOutQuint(t){
+    return 1 - Math.pow(1-t, 5);
+  }
+
+  function normalize(angle){
+    const twoPi = Math.PI*2;
+    let a = angle % twoPi;
+    if(a<0) a += twoPi;
+    return a;
+  }
+
+  // pointer sits at screen angle 0 (right side). Find which segment currently sits there.
+  function segmentAtRotation(rot){
+    const a = normalize(-rot); // wheel-frame angle that maps to screen angle 0
+    for(let i=0;i<bounds.length;i++){
+      const s = normalize(bounds[i].start);
+      const e = normalize(bounds[i].end);
+      if(s < e){
+        if(a >= s && a < e) return i;
+      } else {
+        if(a >= s || a < e) return i;
+      }
+    }
+    return 0;
+  }
+
+  function tickPointer(){
+    pointer.classList.add('tick');
+    setTimeout(()=>pointer.classList.remove('tick'), 100);
+  }
+
+  function spin(){
+    if(spinning) return;
+    spinning = true;
+    spinBtn.disabled = true;
+
+    const chosenIndex = weightedPick();
+    const { start, width } = bounds[chosenIndex];
+
+    const margin = width*0.12;
+    const jitter = margin + Math.random()*(width - margin*2);
+    const targetPointAngle = start + jitter;
+
+    // need rot such that normalize(-rot) == targetPointAngle (mod 2PI)
+    // => rot ≡ -targetPointAngle (mod 2PI)
+    let neededFinal = normalize(-targetPointAngle);
+
+    const extraSpins = 7 + Math.floor(Math.random()*3);
+    const totalRotation = currentRotation + extraSpins*Math.PI*2 + neededFinal - normalize(currentRotation);
+
+    const duration = 5200 + Math.random()*700;
+    const startRotation = currentRotation;
+    const delta = totalRotation - startRotation;
+    const startTime = performance.now();
+
+    let lastSeg = segmentAtRotation(startRotation);
+
+    function frame(now){
+      const elapsed = now - startTime;
+      const t = Math.min(elapsed/duration, 1);
+      const eased = easeOutQuint(t);
+      const rot = startRotation + delta*eased;
+      currentRotation = rot;
+
+      document.getElementById('wheelCanvas').style.transform = `rotate(${rot}rad)`;
+
+      const segNow = segmentAtRotation(rot);
+      if(segNow !== lastSeg){
+        lastSeg = segNow;
+        tickPointer();
+      }
+
+      if(t < 1){
+        requestAnimationFrame(frame);
+      } else {
+        currentRotation = totalRotation;
+        spinning = false;
+        spinBtn.disabled = false;
+        showResult(chosenIndex);
+      }
+    }
+    requestAnimationFrame(frame);
+  }
+
+  function showResult(idx){
+    const seg = segments[idx];
+    resultText.textContent = seg.label;
+    const sub = document.getElementById('resultSub');
+    sub.textContent = seg.message;
+    resetTopicRows();
+    overlay.classList.add('show');
+  }
+
+  function closeOverlay(){
+    overlay.classList.remove('show');
+  }
+
+  // ---------- Topic entry (required before Start) ----------
+  const topicList = document.getElementById('topicList');
+  const addTopicBtn = document.getElementById('addTopicBtn');
+  const topicWarning = document.getElementById('topicWarning');
+
+  function makeTopicRow(){
+    const row = document.createElement('div');
+    row.className = 'topicRow';
+    row.innerHTML = `
+      <span class="bullet">&bull;</span>
+      <input type="text" placeholder="e.g. Rotational dynamics" />
+      <button type="button" class="removeTopic" title="Remove">&times;</button>
+    `;
+    row.querySelector('.removeTopic').addEventListener('click', ()=>{
+      if(topicList.children.length > 1){
+        row.remove();
+      } else {
+        row.querySelector('input').value = '';
+      }
+    });
+    return row;
+  }
+
+  function resetTopicRows(){
+    topicList.innerHTML = '';
+    topicList.appendChild(makeTopicRow());
+    topicWarning.textContent = '';
+  }
+
+  function collectTopics(){
+    return Array.from(topicList.querySelectorAll('input'))
+      .map(i => i.value.trim())
+      .filter(v => v.length > 0);
+  }
+
+  addTopicBtn.addEventListener('click', ()=>{
+    topicList.appendChild(makeTopicRow());
+  });
+
+  resetTopicRows();
+
+  // ---------- Live analog + digital clock ----------
+  const clockTimeStr = document.getElementById('clockTimeStr');
+  const clockAmpm = document.getElementById('clockAmpm');
+  const clockDate = document.getElementById('clockDate');
+  const hourHand = document.getElementById('hourHand');
+  const minHand = document.getElementById('minHand');
+  const secHand = document.getElementById('secHand');
+  const ticksGroup = document.getElementById('ticks');
+
+  function pad2(n){ return n.toString().padStart(2,'0'); }
+
+  // draw the 12 hour ticks once
+  for(let i=0;i<12;i++){
+    const angle = (i*30) * Math.PI/180;
+    const isMajor = (i % 3 === 0);
+    const rOuter = 47;
+    const rInner = isMajor ? 40 : 43;
+    const x1 = 50 + rOuter*Math.sin(angle);
+    const y1 = 50 - rOuter*Math.cos(angle);
+    const x2 = 50 + rInner*Math.sin(angle);
+    const y2 = 50 - rInner*Math.cos(angle);
+    const tick = document.createElementNS('http://www.w3.org/2000/svg','line');
+    tick.setAttribute('x1', x1); tick.setAttribute('y1', y1);
+    tick.setAttribute('x2', x2); tick.setAttribute('y2', y2);
+    tick.setAttribute('stroke-width', isMajor ? 2 : 1);
+    ticksGroup.appendChild(tick);
+  }
+
+  function updateClock(){
+    const now = new Date();
+    let h = now.getHours();
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12; if(h === 0) h = 12;
+    clockTimeStr.textContent = `${h}:${pad2(now.getMinutes())}`;
+    clockAmpm.textContent = ` ${ampm}`;
+    clockDate.textContent = now.toLocaleDateString(undefined, { weekday:'short', month:'short', day:'numeric' });
+
+    const hourDeg = (now.getHours()%12 + now.getMinutes()/60) * 30;
+    const minDeg = (now.getMinutes() + now.getSeconds()/60) * 6;
+    const secDeg = now.getSeconds() * 6;
+    hourHand.setAttribute('transform', `rotate(${hourDeg} 50 50)`);
+    minHand.setAttribute('transform', `rotate(${minDeg} 50 50)`);
+    secHand.setAttribute('transform', `rotate(${secDeg} 50 50)`);
+  }
+  updateClock();
+  setInterval(updateClock, 1000);
+
+  // ---------- Study session timer ----------
+  // Rule: once started, a minimum 60-minute session is locked in.
+  // It can be paused, but never ended, until the 60 minutes have elapsed.
+  // After that, it keeps counting (overtime) until the person chooses to end it.
+  const MIN_SESSION_SECONDS = 60 * 60;
+  const sessionWidget = document.getElementById('sessionWidget');
+  const swSubject = document.getElementById('swSubject');
+  const swTopics = document.getElementById('swTopics');
+  const swTime = document.getElementById('swTime');
+  const swStatus = document.getElementById('swStatus');
+  const pauseBtn = document.getElementById('pauseBtn');
+  const endSessionBtn = document.getElementById('endSessionBtn');
+
+  let sessionElapsed = 0;
+  let sessionPaused = false;
+  let sessionInterval = null;
+  let sessionActive = false;
+  let sessionStartTime = null;
+  let currentSubject = '';
+  let currentTopics = [];
+
+  function formatClock(totalSeconds){
+    const h = Math.floor(totalSeconds/3600);
+    const m = Math.floor((totalSeconds%3600)/60);
+    const s = totalSeconds%60;
+    return h > 0
+      ? `${h}:${pad2(m)}:${pad2(s)}`
+      : `${pad2(m)}:${pad2(s)}`;
+  }
+
+  function renderSession(){
+    const remaining = MIN_SESSION_SECONDS - sessionElapsed;
+    if(remaining > 0){
+      swTime.textContent = formatClock(remaining);
+      swStatus.textContent = sessionPaused ? 'Paused — minimum not yet met' : 'Minimum session remaining';
+      endSessionBtn.disabled = true;
+    } else {
+      const overtime = sessionElapsed - MIN_SESSION_SECONDS;
+      swTime.textContent = formatClock(overtime);
+      swStatus.textContent = sessionPaused ? 'Paused — overtime' : 'Minimum met — running overtime';
+      endSessionBtn.disabled = false;
+    }
+  }
+
+  function startSession(subjectLabel, topics){
+    sessionActive = true;
+    sessionElapsed = 0;
+    sessionPaused = false;
+    sessionStartTime = new Date();
+    currentSubject = subjectLabel;
+    currentTopics = topics;
+    pauseBtn.textContent = 'Pause';
+    swSubject.textContent = subjectLabel;
+    swTopics.textContent = topics.join(' • ');
+    sessionWidget.classList.add('show');
+    spinBtn.disabled = true;
+    renderSession();
+    clearInterval(sessionInterval);
+    sessionInterval = setInterval(()=>{
+      if(sessionPaused) return;
+      sessionElapsed++;
+      renderSession();
+    }, 1000);
+  }
+
+  function togglePause(){
+    if(!sessionActive) return;
+    sessionPaused = !sessionPaused;
+    pauseBtn.textContent = sessionPaused ? 'Resume' : 'Pause';
+    renderSession();
+  }
+
+  // ---------- Session log: localStorage + CSV export ----------
+  // Note: a browser page (even hosted from a GitHub Pages repo) cannot write
+  // or commit files back into the repo itself — there's no filesystem/repo
+  // access from client-side JS. What it CAN do: keep a running log in this
+  // browser's localStorage, and export/download that log as a real .csv file
+  // whenever a session ends (or on demand). To version-control the log,
+  // you'd drop the downloaded CSV into the repo yourself.
+  const LOG_KEY = 'studyWheelSessionLog';
+
+  function getSessionLog(){
+    try{
+      const raw = localStorage.getItem(LOG_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch(e){
+      return [];
+    }
+  }
+
+  function saveSessionLog(log){
+    try{
+      localStorage.setItem(LOG_KEY, JSON.stringify(log));
+    } catch(e){ /* storage unavailable, ignore */ }
+  }
+
+  function csvEscape(val){
+    const str = String(val ?? '');
+    if(/[",\n]/.test(str)){
+      return '"' + str.replace(/"/g,'""') + '"';
+    }
+    return str;
+  }
+
+  function buildCSV(log){
+    const header = ['Subject','Date & Duration','Topics'];
+    const rows = log.map(r => [r.subject, r.dateDuration, r.topics]);
+    return [header, ...rows].map(row => row.map(csvEscape).join(',')).join('\r\n');
+  }
+
+  function downloadCSV(){
+    const log = getSessionLog();
+    if(log.length === 0) return;
+    const csv = buildCSV(log);
+    const blob = new Blob([csv], { type:'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'study-session-log.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function logCompletedSession(){
+    const durationMinutes = Math.max(1, Math.round(sessionElapsed/60));
+    const dateDuration = `${sessionStartTime.toLocaleString(undefined,{dateStyle:'medium', timeStyle:'short'})} — ${durationMinutes} min`;
+    const log = getSessionLog();
+    log.push({
+      subject: currentSubject,
+      dateDuration: dateDuration,
+      topics: currentTopics.join('; '),
+    });
+    saveSessionLog(log);
+    downloadCSV();
+  }
+
+  document.getElementById('exportLogBtn').addEventListener('click', downloadCSV);
+
+  function endSession(){
+    if(!sessionActive) return;
+    if(MIN_SESSION_SECONDS - sessionElapsed > 0) return; // locked until minimum is met
+    clearInterval(sessionInterval);
+    sessionActive = false;
+    logCompletedSession();
+    sessionWidget.classList.remove('show');
+    spinBtn.disabled = false;
+  }
+
+  let lastChosenLabel = '';
+
+  spinBtn.addEventListener('click', spin);
+  workBtn.addEventListener('click', ()=>{
+    const topics = collectTopics();
+    if(topics.length === 0){
+      topicWarning.textContent = 'Enter at least one specific topic before starting.';
+      return;
+    }
+    closeOverlay();
+    startSession(resultText.textContent, topics);
+  });
+  pauseBtn.addEventListener('click', togglePause);
+  endSessionBtn.addEventListener('click', endSession);
+
+})();
+</script>
+</body>
+</html>
