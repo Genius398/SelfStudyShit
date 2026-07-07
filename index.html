@@ -725,8 +725,13 @@
     return allIdx; // absolute fallback, should never actually be reached
   }
 
-  function weightedPick(allowedIndices){
-    const pool = allowedIndices.map(i => ({ i, w: segments[i].weight }));
+  function weightedPick(allowedIndices, weightMultipliers){
+    weightMultipliers = weightMultipliers || {};
+    const pool = allowedIndices.map(i => {
+      const label = segments[i].label;
+      const mult = weightMultipliers[label] !== undefined ? weightMultipliers[label] : 1;
+      return { i, w: segments[i].weight * mult };
+    });
     const poolWeight = pool.reduce((a,p)=>a+p.w, 0);
     let r = Math.random() * poolWeight;
     for(const p of pool){
@@ -863,7 +868,20 @@
     spinBtn.disabled = true;
 
     const allowedIndices = computeAllowedIndices();
-    const chosenIndex = weightedPick(allowedIndices);
+
+    // Soft bias, not a hard rule: the very first spin of the day leans
+    // toward backlog subjects over practice ones. Both stay possible —
+    // this only tilts the odds, it doesn't exclude anything.
+    const todayCounts = getTodayCounts();
+    const totalLoggedToday = Object.values(todayCounts).reduce((a,b)=>a+b, 0);
+    const isFirstSpinOfDay = totalLoggedToday === 0;
+    const weightMultipliers = {};
+    if(isFirstSpinOfDay){
+      BACKLOG_SUBJECTS.forEach(s => weightMultipliers[s] = 3);
+      PRACTICE_SUBJECTS.forEach(s => weightMultipliers[s] = 0.3);
+    }
+
+    const chosenIndex = weightedPick(allowedIndices, weightMultipliers);
     setLastSpunSubject(segments[chosenIndex].label);
     const { start, width } = bounds[chosenIndex];
 
