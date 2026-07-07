@@ -666,13 +666,74 @@
     return { start, end, width };
   });
 
-  function weightedPick(){
-    let r = Math.random() * totalWeight;
-    for(let i=0;i<segments.length;i++){
-      if(r < segments[i].weight) return i;
-      r -= segments[i].weight;
+  // ---------- Subject rules ----------
+  // 1. No two consecutive spins can share a subject.
+  // 2. No subject may be logged more than 3 times in a single day.
+  // 3. IYNA Backlog only becomes eligible after at least one PCMB
+  //    (Physics/Chem/Maths/Bio) session has been logged today.
+  // 4. If today already has a practice session but no backlog session,
+  //    the wheel is restricted to backlog subjects until that's resolved.
+  // All of this is pure selection-logic — the wheel's segments, sizes,
+  // and colors never change to reflect any of it.
+  const BACKLOG_SUBJECTS = ["NSEP backlog", "Maths backlog", "Chem backlog", "IYNA Backlog"];
+  const PRACTICE_SUBJECTS = ["Bio practice", "Math practice", "Chem practice", "Physics practice"];
+  const PCMB_SUBJECTS = ["NSEP backlog", "Maths backlog", "Chem backlog", "Bio practice",
+                          "Math practice", "Chem practice", "Physics practice"];
+  const LAST_SPUN_KEY = 'studyWheelLastSpun';
+
+  function getLastSpunSubject(){
+    try{ return localStorage.getItem(LAST_SPUN_KEY); } catch(e){ return null; }
+  }
+  function setLastSpunSubject(label){
+    try{ localStorage.setItem(LAST_SPUN_KEY, label); } catch(e){ /* ignore */ }
+  }
+
+  function getTodayCounts(){
+    const log = getSessionLog();
+    const todayISO = isoLocalDate(new Date());
+    const counts = {};
+    log.filter(r => r.isoDate === todayISO).forEach(r => {
+      counts[r.subject] = (counts[r.subject] || 0) + 1;
+    });
+    return counts;
+  }
+
+  function computeAllowedIndices(){
+    const counts = getTodayCounts();
+    const lastSubject = getLastSpunSubject();
+    const todayHasPractice = PRACTICE_SUBJECTS.some(s => (counts[s]||0) > 0);
+    const todayHasBacklog = BACKLOG_SUBJECTS.some(s => (counts[s]||0) > 0);
+    const todayHasPCMB = PCMB_SUBJECTS.some(s => (counts[s]||0) > 0);
+    const mustPickBacklog = todayHasPractice && !todayHasBacklog;
+
+    const allIdx = segments.map((s,i)=>i);
+
+    const rules = [
+      i => segments[i].label !== lastSubject,                 // no consecutive repeat
+      i => (counts[segments[i].label] || 0) < 3,               // max 3 / day
+      i => segments[i].label !== 'IYNA Backlog' || todayHasPCMB, // IYNA needs a PCMB session first
+      i => !mustPickBacklog || BACKLOG_SUBJECTS.includes(segments[i].label), // backlog owed
+    ];
+
+    // Apply rules in priority order, relaxing the least important ones
+    // first if they'd otherwise empty the pool out entirely.
+    for(let dropFrom = rules.length; dropFrom >= 0; dropFrom--){
+      const active = rules.slice(0, dropFrom);
+      const pool = allIdx.filter(i => active.every(rule => rule(i)));
+      if(pool.length > 0) return pool;
     }
-    return segments.length-1;
+    return allIdx; // absolute fallback, should never actually be reached
+  }
+
+  function weightedPick(allowedIndices){
+    const pool = allowedIndices.map(i => ({ i, w: segments[i].weight }));
+    const poolWeight = pool.reduce((a,p)=>a+p.w, 0);
+    let r = Math.random() * poolWeight;
+    for(const p of pool){
+      if(r < p.w) return p.i;
+      r -= p.w;
+    }
+    return pool[pool.length-1].i;
   }
 
   // ---------- Canvas drawing ----------
@@ -801,7 +862,9 @@
     spinning = true;
     spinBtn.disabled = true;
 
-    const chosenIndex = weightedPick();
+    const allowedIndices = computeAllowedIndices();
+    const chosenIndex = weightedPick(allowedIndices);
+    setLastSpunSubject(segments[chosenIndex].label);
     const { start, width } = bounds[chosenIndex];
 
     const margin = width*0.12;
