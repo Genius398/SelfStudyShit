@@ -383,6 +383,68 @@
     #liveClock .analogFace{width:68px;height:68px;}
   }
 
+  /* ---- today's sessions, top-right ---- */
+  #todayLog{
+    position:fixed;
+    right:22px;
+    top:22px;
+    background:var(--panel);
+    border:1px solid var(--gold);
+    border-radius:6px;
+    padding:14px 16px;
+    z-index:40;
+    width:210px;
+    max-height:60vh;
+    display:flex;
+    flex-direction:column;
+    box-shadow:0 8px 20px -12px rgba(0,0,0,.4);
+  }
+  #todayLog .clockLabel{
+    font-size:9px;
+    letter-spacing:.2em;
+    text-transform:uppercase;
+    color:var(--gold);
+    margin-bottom:10px;
+    text-align:left;
+  }
+  #todayLogList{
+    overflow-y:auto;
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+  }
+  .todayEmpty{
+    font-size:12px;
+    font-style:italic;
+    color:var(--muted);
+  }
+  .todayRow{
+    border-bottom:1px solid var(--line);
+    padding-bottom:7px;
+  }
+  .todayRow:last-child{border-bottom:none;padding-bottom:0;}
+  .todayRow .tr-subject{
+    font-size:12.5px;
+    font-weight:700;
+    color:var(--ink);
+    line-height:1.3;
+  }
+  .todayRow .tr-meta{
+    font-size:10.5px;
+    font-style:italic;
+    color:var(--muted);
+    margin-top:1px;
+  }
+  @media (max-width:760px){
+    #todayLog{
+      right:12px;
+      top:12px;
+      width:150px;
+      padding:10px 12px;
+      max-height:40vh;
+    }
+  }
+
   /* ---- session timer widget, bottom-right ---- */
   #sessionWidget{
     position:fixed;
@@ -515,6 +577,13 @@
     </div>
   </div>
 
+  <div id="todayLog">
+    <div class="clockLabel">Today's Sessions</div>
+    <div id="todayLogList">
+      <div class="todayEmpty">No sessions yet.</div>
+    </div>
+  </div>
+
   <div class="eyebrow">Pick of the Day</div>
   <h1>The Study Wheel</h1>
   <div class="rule"></div>
@@ -573,6 +642,8 @@
       message: "Physical, organic, or inorganic — GOC, thermodynamics, or periodic trends. Pick the one you keep skipping." },
     { label: "Bio practice",     weight:8,  color1:"#5a4a2c", color2:"#40351f",
       message: "A NCERT-line round — diagrams, genetics, or physiology. Quick recall practice, nothing heavy." },
+    { label: "IYNA Backlog",     weight:8,  color1:"#3d5a80", color2:"#28405c",
+      message: "Whatever's stacked up in the IYNA queue — pick the piece that's waited longest and clear it." },
     { label: "Math practice",    weight:15, color1:"#4a3960", color2:"#362946",
       message: "Trigonometry, calculus, or algebra drills — a working problem set to keep formulas sharp." },
     { label: "Chem practice",    weight:15, color1:"#a9852f", color2:"#7c621f",
@@ -1004,17 +1075,53 @@
     URL.revokeObjectURL(url);
   }
 
+  function isoLocalDate(d){
+    const y = d.getFullYear();
+    const m = String(d.getMonth()+1).padStart(2,'0');
+    const day = String(d.getDate()).padStart(2,'0');
+    return `${y}-${m}-${day}`;
+  }
+
+  // ---------- Today's sessions panel (right side) ----------
+  const todayLogList = document.getElementById('todayLogList');
+
+  function renderTodayLog(){
+    const log = getSessionLog();
+    const todayISO = isoLocalDate(new Date());
+    const todays = log.filter(r => r.isoDate === todayISO);
+
+    if(todays.length === 0){
+      todayLogList.innerHTML = '<div class="todayEmpty">No sessions yet.</div>';
+      return;
+    }
+
+    todayLogList.innerHTML = todays.map(r => `
+      <div class="todayRow">
+        <div class="tr-subject">${r.subject}</div>
+        <div class="tr-meta">${r.dateDisplay} • ${r.durationMinutes} min</div>
+      </div>
+    `).join('');
+  }
+
+  renderTodayLog();
+
   function logCompletedSession(){
     const durationMinutes = Math.max(1, Math.round(sessionElapsed/60));
-    const dateDuration = `${sessionStartTime.toLocaleString(undefined,{dateStyle:'medium', timeStyle:'short'})} — ${durationMinutes} min`;
+    const dateDisplay = sessionStartTime.toLocaleDateString(undefined,{month:'short', day:'numeric'});
+    const fullDateTime = sessionStartTime.toLocaleString(undefined,{dateStyle:'medium', timeStyle:'short'});
+    const dateDuration = `${fullDateTime} — ${durationMinutes} min`;
     const log = getSessionLog();
     log.push({
       subject: currentSubject,
       dateDuration: dateDuration,
       topics: currentTopics.join('; '),
+      isoDate: isoLocalDate(sessionStartTime),
+      dateDisplay: dateDisplay,
+      durationMinutes: durationMinutes,
     });
     saveSessionLog(log);
     downloadCSV();
+    renderTodayLog();
   }
 
   document.getElementById('exportLogBtn').addEventListener('click', downloadCSV);
